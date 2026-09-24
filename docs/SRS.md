@@ -73,6 +73,7 @@ Hackathon build team and reviewers.
 
 ### 1.6 References
 - `readme.md` — original project brief and architecture (authoritative source for this SRS).
+- `DFD.md` — data flow + telemetry pipeline for the confirmed monitored application (resolves open question B.1 below).
 - LangGraph/LangChain, AWS Bedrock, Prometheus/Alertmanager/Loki documentation.
 
 ---
@@ -343,7 +344,7 @@ Phase 2 (§10.C) adds a cross-layer use case combining a Kubernetes rollback wit
 See §1.5.
 
 ### B. Open Questions
-1. What is the existing monitored application, and does it expose `/metrics` and structured logs today?
+1. ~~What is the existing monitored application?~~ RESOLVED: `open-telemetry/opentelemetry-demo` — see `DFD.md`.
 2. Which Bedrock model ID is approved for use (e.g., Anthropic Claude 3.5 Sonnet)?
 
 ### C. Phase 2 — Good to Have (build only after the MVP loop works end-to-end)

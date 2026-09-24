@@ -29,6 +29,7 @@
 
 | Layer | Choice |
 |---|---|
+| APP | OpenTelemetry |
 | Agent orchestration | LangGraph + LangChain (Python) |
 | LLM | AWS Bedrock (Anthropic Claude 3.x) |
 | API | FastAPI |
@@ -109,6 +110,7 @@ Phase 2 adds (as new files, not modifications to the above): `tools/otel_tool.py
 - Repo scaffold per §3; confirm Bedrock model access with a smoke-test call.
 - Stand up `kind` cluster; confirm `kubectl` context points at it (never a shared cluster).
 - Confirm monitored app exposes `/metrics` and structured logs; add minimal instrumentation if missing.
+- Deploy Alertmanager as new infra pointed at the monitored app's existing Prometheus — it is not part of the monitored app's own stack and must be stood up ourselves (see [DFD.md](./DFD.md) §5 A2).
 - Bring up Postgres, run initial schema migration.
 
 ### Phase 1 — Observability & Detection (Hour 2–8)

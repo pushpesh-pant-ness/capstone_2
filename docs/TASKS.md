@@ -22,9 +22,10 @@
 
 ## 1. Phase 0 — Shared Setup (Hour 0–2, do together)
 
-- [ ] Confirm answers to SRS §10.B open questions (monitored app identity, Bedrock model ID) — or default to: generic instrumented FastAPI sample app, Claude 3.5 Sonnet on Bedrock.
+- [ ] Confirm the answer to SRS §10.B's remaining open question (Bedrock model ID) — or default to Claude 3.5 Sonnet on Bedrock. Monitored app is already confirmed as `open-telemetry/opentelemetry-demo` (see [DFD.md](./DFD.md)).
 - [ ] Create repo skeleton per [BUILD_PLAN.md §3](./BUILD_PLAN.md#3-proposed-repository-structure) (`agent/`, `tools/`, `api/`, `ui/`, `db/`, `infra/`, `tests/`, `scripts/`).
 - [ ] Both: install Docker, `kind`/`minikube`, `kubectl`; Person 2 creates the `kind` cluster (`infra/kind-config.yaml`) and confirms `kubectl config current-context` points at it.
+- [ ] Person 1: stand up Alertmanager as new infra (the monitored app doesn't ship one) pointed at its existing Prometheus; confirm it can fire a test alert.
 - [ ] Person 2: run an AWS Bedrock smoke test (single `InvokeModel` call) to confirm model access/region/credentials work.
 - [ ] Person 1: bring up Postgres via Docker Compose; apply `db/schema.sql` v0 (empty `incidents`, `audit_log` tables per SRS §6).
 - [ ] Agree the **Incident JSON contract** together (SRS §6.1) — write it into `agent/state.py` (Track 2) and `api/models.py` (Track 1) identically.
