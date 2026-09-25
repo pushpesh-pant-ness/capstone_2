@@ -69,20 +69,25 @@ async def run_investigation(incident_id: UUID, initial_state: AgentState) -> Non
         async for update in graph.astream(initial_state, stream_mode="updates"):
             for node_name, partial in update.items():
                 state.update(partial)
-                action_type = "llm_call" if node_name in ("severity", "rca", "plan") else "tool_call"
+                # node id is "assess_severity", not "severity" (collides with the state key)
+                action_type = "llm_call" if node_name in ("assess_severity", "rca", "plan") else "tool_call"
                 await repo.log_audit_event(incident_id, "agent", action_type, {"node": node_name, "output": partial})
     except Exception as exc:  # noqa: BLE001
         logger.exception("investigation pipeline failed for incident %s", incident_id)
-        await repo.update_incident(incident_id, status="escalated")
+        await repo.update_incident(incident_id, status="escalated", escalation_reason=str(exc))
         await repo.log_audit_event(
             incident_id, "system", "state_transition", {"status": "escalated", "error": str(exc)}
         )
         return
 
     similar_ids = [c["incident_id"] for c in state.get("similar_incidents", []) if c.get("incident_id")]
+    # docs/AGENTS.md §3: rca (low_confidence) or guardrail may have set this —
+    # escalate instead of putting an unvetted/unfounded plan in front of a human.
+    escalation_reason = state.get("escalation_reason")
+    final_status = "escalated" if escalation_reason else "pending_approval"
     await repo.update_incident(
         incident_id,
-        status="pending_approval",
+        status=final_status,
         deployment_version=state.get("deployment_version"),
         evidence=state.get("evidence"),
         baseline=state.get("baseline"),
@@ -91,8 +96,11 @@ async def run_investigation(incident_id: UUID, initial_state: AgentState) -> Non
         confidence_score=state.get("confidence_score"),
         remediation_plan=state.get("remediation_plan"),
         similar_incident_ids=similar_ids,
+        escalation_reason=escalation_reason,
     )
-    await repo.log_audit_event(incident_id, "system", "state_transition", {"status": "pending_approval"})
+    await repo.log_audit_event(
+        incident_id, "system", "state_transition", {"status": final_status, "escalation_reason": escalation_reason}
+    )
 
 
 async def run_remediation_and_validation(incident_id: UUID) -> None:

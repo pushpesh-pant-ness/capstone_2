@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS incidents (
     approved_by          TEXT,
     approved_at          TIMESTAMPTZ,
     rejection_reason     TEXT,
+    escalation_reason    TEXT,                     -- agent-driven (rca low_confidence / guardrail), see docs/AGENTS.md §3
     validation_result    JSONB                     -- {"recovered": bool, "evidence": {...}}
 );
 

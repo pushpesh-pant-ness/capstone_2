@@ -42,6 +42,7 @@ docker compose -f infra/docker-compose.yaml up -d
 
 ```powershell
 Get-Content db/migrations/0001_init.sql | docker exec -i $(docker compose -f infra/docker-compose.yaml ps -q postgres) psql -U incident_agent -d incident_agent
+Get-Content db/migrations/0002_add_escalation_reason.sql | docker exec -i $(docker compose -f infra/docker-compose.yaml ps -q postgres) psql -U incident_agent -d incident_agent
 ```
 
 ## 5. (Optional) Seed historical incidents

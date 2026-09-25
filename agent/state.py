@@ -39,6 +39,12 @@ class AgentState(TypedDict, total=False):
     # Plan (FR-10, FR-11)
     remediation_plan: list[dict[str, Any]]   # ordered list of {target, name, params, risk}
 
+    # Escalation (docs/AGENTS.md §3 — supervisor/rca/guardrail handoff): set by
+    # rca (low_confidence) or the guardrail node when a plan fails its sanity
+    # check; presence signals the caller (api/pipeline.py) to mark the
+    # incident escalated instead of pending_approval.
+    escalation_reason: Optional[str]
+
     # Approval (FR-12..14) — set by the API, not by the graph itself
     approval_status: str                # pending|approved|rejected
     approved_by: Optional[str]

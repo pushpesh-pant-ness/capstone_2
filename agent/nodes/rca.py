@@ -38,8 +38,20 @@ async def rca(state: AgentState) -> dict[str, Any]:
         root_cause_summary = f"[LLM unavailable: {exc}] {rule_summary}"
         confidence_score = rule_confidence
 
-    return {
+    low_confidence = confidence_score < LOW_CONFIDENCE_THRESHOLD
+    result: dict[str, Any] = {
         "root_cause_summary": root_cause_summary,
         "confidence_score": confidence_score,
-        "low_confidence": confidence_score < LOW_CONFIDENCE_THRESHOLD,
+        "low_confidence": low_confidence,
     }
+    if low_confidence:
+        # docs/AGENTS.md §3: low-confidence RCA hands off to escalate instead
+        # of letting Plan invent actions for a root cause it isn't sure of.
+        result["escalation_reason"] = (
+            f"RCA confidence {confidence_score:.2f} below threshold {LOW_CONFIDENCE_THRESHOLD}"
+        )
+    return result
+
+
+def route_after_rca(state: AgentState) -> str:
+    return "escalate" if state.get("low_confidence") else "plan"
