@@ -11,9 +11,9 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-# Default per SRS/BUILD_PLAN: Anthropic Claude 3.x on Bedrock. Override via env
-# once SRS §10.B's open question (exact model ID) is resolved for this account.
-BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
+# anthropic.claude-3-5-sonnet-20240620-v1:0 (SRS/BUILD_PLAN default) is retired
+# and unavailable on this account; amazon.nova-pro-v1:0 is confirmed working.
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-pro-v1:0")
 
 _client = None
 

@@ -133,7 +133,7 @@ async def update_incident(incident_id: UUID, **fields: Any) -> None:
     set_parts = []
     for i, (key, value) in enumerate(fields.items(), start=2):
         if key in json_fields and value is not None and not isinstance(value, str):
-            value = json.dumps(value)
+            value = json.dumps(value, default=str)
         set_parts.append(f"{key} = ${i}")
         values.append(value)
     query = f"UPDATE incidents SET {', '.join(set_parts)} WHERE incident_id = $1"
@@ -177,7 +177,8 @@ async def log_audit_event(
             VALUES ($1, $2, $3, $4)
             """,
             incident_id, actor, action_type,
-            json.dumps(redact(payload)) if payload is not None else None,
+            # default=str: payloads carry UUID/datetime values (e.g. similar_incidents rows)
+            json.dumps(redact(payload), default=str) if payload is not None else None,
         )
 
 
