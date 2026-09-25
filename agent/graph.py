@@ -21,14 +21,15 @@ from .state import AgentState
 def build_graph():
     builder = StateGraph(AgentState)
     builder.add_node("investigate", investigate)
-    builder.add_node("severity", severity)
+    # node id can't be "severity" — it collides with the AgentState "severity" key
+    builder.add_node("assess_severity", severity)
     builder.add_node("historical", historical)
     builder.add_node("rca", rca)
     builder.add_node("plan", plan)
 
     builder.add_edge(START, "investigate")
-    builder.add_edge("investigate", "severity")
-    builder.add_edge("severity", "historical")
+    builder.add_edge("investigate", "assess_severity")
+    builder.add_edge("assess_severity", "historical")
     builder.add_edge("historical", "rca")
     builder.add_edge("rca", "plan")
     builder.add_edge("plan", END)
