@@ -1,0 +1,78 @@
+# Fault registry — reference data describing each incident/fault scenario this
+# project can trigger manually via inject.py, and the expected alert/root cause/
+# remediation for evaluating the agent's accuracy (SRS §4 use cases). Not read
+# by the agent pipeline itself (api/pipeline.py) — the Plan node always derives
+# its own plan from tools/allowlist.yaml, independent of this file.
+#
+# type: flagd       -> toggled via the OTel Demo's flagd feature-flag configmap
+# type: crash_loop  -> toggled via a liveness-probe patch on a target Deployment
+#
+# expected_remediation is descriptive only; toggle_flag_off isn't part of the
+# MVP tool allow-list (SRS §7 — Kubernetes-only: restart_pod, rollback_deployment,
+# scale_deployment), so those scenarios are expected to resolve via a K8s action
+# instead once picked up by the real pipeline.
+
+faults:
+  - id: paymentFailure
+    type: flagd
+    flag_key: paymentFailure
+    on_variant: "100%"
+    off_variant: "off"
+    target_service: payment
+    severity: critical
+    expected_alert: HighHttpErrorRate
+    expected_root_cause: "Payment service failing all charge requests"
+    expected_remediation: toggle_flag_off
+
+  - id: paymentUnreachable
+    type: flagd
+    flag_key: paymentUnreachable
+    on_variant: "on"
+    off_variant: "off"
+    target_service: payment
+    severity: critical
+    expected_alert: HighLatencyP95
+    expected_root_cause: "Payment service unreachable; checkout calls time out"
+    expected_remediation: toggle_flag_off
+
+  - id: productCatalogFailure
+    type: flagd
+    flag_key: productCatalogFailure
+    on_variant: "on"
+    off_variant: "off"
+    target_service: product-catalog
+    severity: warning
+    expected_alert: HighHttpErrorRate
+    expected_root_cause: "Product catalog failing lookups for a specific product"
+    expected_remediation: toggle_flag_off
+
+  - id: adHighCpu
+    type: flagd
+    flag_key: adHighCpu
+    on_variant: "on"
+    off_variant: "off"
+    target_service: ad
+    severity: warning
+    expected_alert: HighLatencyP95
+    expected_root_cause: "Ad service under high CPU load, degraded response times"
+    expected_remediation: toggle_flag_off
+
+  - id: kafkaQueueProblems
+    type: flagd
+    flag_key: kafkaQueueProblems
+    on_variant: "on"
+    off_variant: "off"
+    target_service: kafka
+    severity: warning
+    expected_alert: KafkaConsumerLagHigh
+    expected_root_cause: "Kafka queue overloaded; consumer lag spiking on orders topic"
+    expected_remediation: toggle_flag_off
+
+  - id: podCrashLoop
+    type: crash_loop
+    target_deployment: recommendation
+    target_service: recommendation
+    severity: critical
+    expected_alert: PodCrashLooping
+    expected_root_cause: "Recommendation service container crash-looping (failing liveness probe)"
+    expected_remediation: rollback_deployment

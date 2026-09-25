@@ -1,0 +1,25 @@
+# Postgres via Docker Compose (BUILD_PLAN.md Phase 0). The Agent/API connect
+# using DATABASE_URL (see db/repository.py); apply db/migrations/ once the
+# container is up:
+#   docker compose -f infra/docker-compose.yaml up -d
+#   psql "$DATABASE_URL" -f db/migrations/0001_init.sql
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: incident_agent
+      POSTGRES_PASSWORD: incident_agent_dev_password
+      POSTGRES_DB: incident_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U incident_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:

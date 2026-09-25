@@ -1,0 +1,34 @@
+# Alert rules (SRS.md FR-1 / BUILD_PLAN.md Phase 1): crash-loop pods, elevated
+# error rate, latency SLO breach.
+groups:
+  - name: incident-agent-rules
+    rules:
+      - alert: HighHttpErrorRate
+        expr: >
+          sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
+          / sum by (service) (rate(http_requests_total[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP 5xx error rate on {{ $labels.service }}"
+          description: "More than 5% of requests to {{ $labels.service }} are failing with 5xx."
+
+      - alert: HighLatencyP95
+        expr: >
+          histogram_quantile(0.95, sum by (le, service) (rate(http_request_duration_seconds_bucket[5m]))) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 latency SLO breach on {{ $labels.service }}"
+          description: "p95 latency for {{ $labels.service }} has exceeded 2s for 5 minutes."
+
+      - alert: PodCrashLooping
+        expr: increase(kube_pod_container_status_restarts_total[10m]) > 3
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash-looping"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} restarted more than 3 times in 10 minutes."

@@ -1,0 +1,14 @@
+route:
+  receiver: incident-agent-webhook
+  group_by: ["alertname", "service"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+
+receivers:
+  - name: incident-agent-webhook
+    webhook_configs:
+      # Agent Intake API (api/routers/alerts.py). Adjust host if the Agent API
+      # doesn't run on the docker-compose network under this name.
+      - url: "http://host.docker.internal:8000/webhooks/alertmanager"
+        send_resolved: false

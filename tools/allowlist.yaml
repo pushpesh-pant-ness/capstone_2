@@ -1,0 +1,28 @@
+# Tool Allow-list (SRS.md §7 — MVP, Kubernetes only).
+#
+# The LLM may only *propose* actions from this catalog. The Executor
+# (tools/k8s_tool.py + agent/nodes/plan.py) enforces this list independently of
+# the LLM's output — an unrecognized action is rejected before it ever reaches
+# a human (FR-10, FR-11, FR-15).
+#
+# Phase 2 (SRS §10.C) adds AWS actions and a GitHub `open_revert_pr` action —
+# do not add them here until the MVP loop works end-to-end.
+
+tools:
+  - target: kubernetes
+    name: restart_pod
+    description: Delete pod(s) so their controller recreates them
+    risk: low
+    approval_required: true
+
+  - target: kubernetes
+    name: rollback_deployment
+    description: "kubectl rollout undo to the previous revision"
+    risk: medium
+    approval_required: true
+
+  - target: kubernetes
+    name: scale_deployment
+    description: Adjust replica count
+    risk: low_medium
+    approval_required: true
