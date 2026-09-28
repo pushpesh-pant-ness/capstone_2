@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Incident Remediation Agent — Live Demo</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Autonomous Post-Deployment Incident &amp; Remediation Agent</h1>
+    <span id="conn-status" class="badge">connecting…</span>
+  </header>
+
+  <div class="layout">
+    <aside id="fault-panel">
+      <h2>Trigger Fault</h2>
+      <div id="fault-list">Loading faults…</div>
+    </aside>
+
+    <main>
+      <section id="incident-list-section">
+        <h2>Incidents</h2>
+        <table id="incident-table">
+          <thead>
+            <tr><th>Alert</th><th>Service</th><th>Severity</th><th>Status</th><th>Created</th></tr>
+          </thead>
+          <tbody id="incident-table-body"></tbody>
+        </table>
+      </section>
+
+      <section id="incident-detail-section" hidden>
+        <h2 id="detail-title">Incident</h2>
+
+        <div id="approval-panel" class="panel" hidden>
+          <h3>Approval Required</h3>
+          <p id="approval-plan-text"></p>
+          <input id="actor-name" placeholder="your name" />
+          <button id="approve-btn">Approve &amp; Remediate</button>
+          <button id="reject-btn" class="secondary">Reject / Escalate</button>
+        </div>
+
+        <div id="outcome-panel" class="panel" hidden>
+          <h3>Outcome</h3>
+          <p id="outcome-text"></p>
+        </div>
+
+        <h3>Live Agent Timeline</h3>
+        <div id="timeline"></div>
+      </section>
+    </main>
+  </div>
+
+<script src="/app.js"></script>
+</body>
+</html>

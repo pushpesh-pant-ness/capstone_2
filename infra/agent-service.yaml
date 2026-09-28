@@ -1,0 +1,107 @@
+# Incident Agent service: FastAPI + LangGraph + static demo UI, all one Deployment
+# (see agent_service/). Namespace: incident-agent.
+#
+# RBAC is scoped ONLY to what the allow-listed remediation tools need, and ONLY
+# in the otel-demo namespace (the agent must never touch its own namespace or
+# any other workload) — see ARCHITECTURE.md section 7 (tool allow-list).
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: incident-agent
+  namespace: incident-agent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: incident-agent-remediator
+  namespace: otel-demo
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: incident-agent-remediator-binding
+  namespace: otel-demo
+subjects:
+  - kind: ServiceAccount
+    name: incident-agent
+    namespace: incident-agent
+roleRef:
+  kind: Role
+  name: incident-agent-remediator
+  apiGroup: rbac.authorization.k8s.io
+---
+# NOTE: the `incident-agent-secrets` Secret (AWS Bedrock creds, GitHub token) is NOT
+# defined here. It's created/updated from the local .env file by scripts/setup.ps1
+# (see .env.example) so real credentials never end up in a committed manifest.
+apiVersion: v1
+kind: Service
+metadata:
+  name: incident-agent-api
+  namespace: incident-agent
+spec:
+  selector:
+    app: incident-agent
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30800
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incident-agent
+  namespace: incident-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: incident-agent
+  template:
+    metadata:
+      labels:
+        app: incident-agent
+    spec:
+      serviceAccountName: incident-agent
+      containers:
+        - name: incident-agent
+          image: incident-agent-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+            - secretRef:
+                name: incident-agent-secrets
+          env:
+            - name: APP_NAMESPACE
+              value: "otel-demo"
+            - name: FAULT_REGISTRY_PATH
+              value: "/app/fault-registry/registry.yaml"
+          volumeMounts:
+            - name: fault-registry
+              mountPath: /app/fault-registry
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+          resources:
+            limits:
+              memory: 400Mi
+      volumes:
+        - name: fault-registry
+          configMap:
+            name: fault-registry

@@ -1,0 +1,129 @@
+# Helm values overrides for the OpenTelemetry Demo ("Astronomy Shop")
+# deployed into a local kind cluster (namespace: otel-demo).
+#
+# Kept from upstream: bundled Prometheus + Grafana sub-charts (already wired for
+# OTLP ingestion + dashboards) and Jaeger for traces.
+# Changed vs upstream:
+#  - OpenSearch disabled; collector's logs pipeline exports to Loki instead
+#    (Loki itself is deployed separately into the `observability` namespace).
+#  - Prometheus Alertmanager enabled + our own alert rules.
+#  - frontend-proxy exposed via NodePort (30080) so kind can map it to the host.
+
+components:
+  frontend-proxy:
+    service:
+      type: NodePort
+      nodePort: 30080
+
+opensearch:
+  enabled: false
+
+grafana:
+  # Drop the opensearch datasource plugin since OpenSearch is disabled.
+  plugins: []
+  # Chart default (300Mi limit / GOMEMLIMIT ~270MiB) is too tight for Grafana
+  # 13.2's apiserver/unified-storage stack - was hitting Go runtime "out of
+  # memory" fatal errors (exit code 2) during startup.
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      memory: 512Mi
+  # Grafana 13's apiserver/unified-storage init sequence can take well over the
+  # chart's default 160s liveness grace (60s initialDelay + 10x10s), especially
+  # on this Windows/kind host under load, causing a kill-mid-startup crash loop.
+  # Give it much more headroom before liveness/readiness give up.
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 90
+    periodSeconds: 10
+    failureThreshold: 30
+    timeoutSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    periodSeconds: 10
+    failureThreshold: 30
+    timeoutSeconds: 10
+
+prometheus:
+  alertmanager:
+    enabled: true
+    fullnameOverride: alertmanager
+    service:
+      type: NodePort
+      nodePort: 30093
+    config:
+      route:
+        receiver: incident-agent-webhook
+        group_by: ["alertname", "service"]
+        group_wait: 10s
+        group_interval: 30s
+        repeat_interval: 1h
+      receivers:
+        - name: incident-agent-webhook
+          webhook_configs:
+            - url: http://incident-agent-api.incident-agent.svc.cluster.local:8000/webhooks/alertmanager
+              send_resolved: true
+  server:
+    fullnameOverride: prometheus
+  serverFiles:
+    alerting_rules.yml:
+      groups:
+        - name: incident-agent-core-alerts
+          rules:
+            - alert: HighHttpErrorRate
+              expr: |
+                sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[2m]))
+                /
+                sum by (service_name) (rate(http_server_request_duration_seconds_count[2m])) > 0.10
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: "High HTTP 5xx error rate on {{ $labels.service_name }}"
+                description: "{{ $labels.service_name }} has >10% 5xx responses over the last 2m."
+            - alert: HighLatencyP95
+              expr: |
+                histogram_quantile(0.95, sum by (le, service_name) (rate(http_server_request_duration_seconds_bucket[5m]))) > 1.5
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "High p95 latency on {{ $labels.service_name }}"
+                description: "{{ $labels.service_name }} p95 latency above 1.5s for 2m."
+            - alert: PodCrashLooping
+              expr: |
+                increase(kube_pod_container_status_restarts_total{namespace="otel-demo"}[10m]) > 3
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Pod crash-looping: {{ $labels.pod }}"
+                description: "{{ $labels.pod }} in namespace otel-demo restarted more than 3 times in 10m."
+            - alert: KafkaConsumerLagHigh
+              expr: |
+                sum by (topic) (kafka_consumer_group_lag{topic="orders"}) > 1000
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Kafka consumer lag high on topic {{ $labels.topic }}"
+                description: "Consumer lag for topic {{ $labels.topic }} exceeds 1000 messages."
+
+opentelemetry-collector:
+  config:
+    exporters:
+      # Loki has native OTLP ingestion; standard otlphttp exporter, no special
+      # loki-specific exporter needed. https://grafana.com/docs/loki/latest/send-data/otel/
+      otlphttp/loki:
+        endpoint: http://loki.observability.svc.cluster.local:3100/otlp
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        logs:
+          exporters: [otlphttp/loki, debug]

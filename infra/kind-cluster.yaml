@@ -1,0 +1,23 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: incident-agent
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # OTel Demo frontend-proxy (envoy) — browse the demo shop
+      - containerPort: 30080
+        hostPort: 8080
+        protocol: TCP
+      # Grafana
+      - containerPort: 30030
+        hostPort: 3000
+        protocol: TCP
+      # Incident Agent API + demo UI
+      - containerPort: 30800
+        hostPort: 8000
+        protocol: TCP
+      - containerPort: 30810
+        hostPort: 8081
+        protocol: TCP
+  - role: worker
+  - role: worker

@@ -1,0 +1,74 @@
+# Fault registry — single source of truth for every incident/fault scenario this
+# project can trigger. Adding a new fault later = add one entry here (+ a handler
+# function in _handlers.py if type is not already supported). Nothing else changes:
+# the CLI (inject.py) and the demo UI's "Trigger Fault" panel both read this file.
+#
+# type: flagd       -> toggled via the OTel Demo's flagd feature-flag configmap
+# type: crash_loop  -> toggled via a liveness-probe patch on a target Deployment
+#
+# expected_remediation values map to tool names implemented in agent/tools/k8s_tools.py
+
+faults:
+  - id: paymentFailure
+    type: flagd
+    flag_key: paymentFailure
+    on_variant: "100%"
+    off_variant: "off"
+    target_service: payment
+    severity: critical
+    expected_alert: HighHttpErrorRate
+    expected_root_cause: "Payment service failing all charge requests"
+    expected_remediation: toggle_flag_off
+
+  - id: paymentUnreachable
+    type: flagd
+    flag_key: paymentUnreachable
+    on_variant: "on"
+    off_variant: "off"
+    target_service: payment
+    severity: critical
+    expected_alert: HighLatencyP95
+    expected_root_cause: "Payment service unreachable; checkout calls time out"
+    expected_remediation: toggle_flag_off
+
+  - id: productCatalogFailure
+    type: flagd
+    flag_key: productCatalogFailure
+    on_variant: "on"
+    off_variant: "off"
+    target_service: product-catalog
+    severity: warning
+    expected_alert: HighHttpErrorRate
+    expected_root_cause: "Product catalog failing lookups for a specific product"
+    expected_remediation: toggle_flag_off
+
+  - id: adHighCpu
+    type: flagd
+    flag_key: adHighCpu
+    on_variant: "on"
+    off_variant: "off"
+    target_service: ad
+    severity: warning
+    expected_alert: HighLatencyP95
+    expected_root_cause: "Ad service under high CPU load, degraded response times"
+    expected_remediation: toggle_flag_off
+
+  - id: kafkaQueueProblems
+    type: flagd
+    flag_key: kafkaQueueProblems
+    on_variant: "on"
+    off_variant: "off"
+    target_service: kafka
+    severity: warning
+    expected_alert: KafkaConsumerLagHigh
+    expected_root_cause: "Kafka queue overloaded; consumer lag spiking on orders topic"
+    expected_remediation: toggle_flag_off
+
+  - id: podCrashLoop
+    type: crash_loop
+    target_deployment: recommendation
+    target_service: recommendation
+    severity: critical
+    expected_alert: PodCrashLooping
+    expected_root_cause: "Recommendation service container crash-looping (failing liveness probe)"
+    expected_remediation: rollback_deployment

@@ -1,0 +1,123 @@
+# PostgreSQL + pgvector, in-cluster, namespace: incident-agent.
+# Stores historical incident records + embeddings for similarity search.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: incident-agent
+type: Opaque
+stringData:
+  POSTGRES_USER: incident_agent
+  POSTGRES_PASSWORD: incident_agent_dev_password
+  POSTGRES_DB: incident_agent
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+  namespace: incident-agent
+data:
+  init.sql: |
+    CREATE EXTENSION IF NOT EXISTS vector;
+
+    CREATE TABLE IF NOT EXISTS incidents (
+        id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+        resolved_at         TIMESTAMPTZ,
+        fault_id            TEXT,                 -- fault registry id, if known
+        alert_name          TEXT NOT NULL,
+        service_name        TEXT,
+        severity            TEXT,
+        status               TEXT NOT NULL DEFAULT 'open', -- open|awaiting_approval|remediating|validating|resolved|escalated
+        summary             TEXT,
+        root_cause          TEXT,
+        evidence            JSONB,                -- raw logs/metrics/traces snapshots used
+        remediation_plan    JSONB,
+        remediation_action  TEXT,
+        approved_by         TEXT,
+        approved_at         TIMESTAMPTZ,
+        outcome             TEXT,                 -- recovered|not_recovered
+        embedding           vector(1024)           -- Amazon Titan/Nova embedding dimension
+    );
+
+    CREATE INDEX IF NOT EXISTS incidents_embedding_idx
+        ON incidents USING hnsw (embedding vector_cosine_ops);
+
+    CREATE TABLE IF NOT EXISTS incident_steps (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        incident_id   UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+        step_index    INT NOT NULL,
+        node_name     TEXT NOT NULL,              -- detect|investigate|diagnose|severity|plan|approval|remediate|validate|resolve
+        started_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+        finished_at   TIMESTAMPTZ,
+        input         JSONB,
+        output        JSONB,
+        llm_prompt    TEXT,
+        llm_response  TEXT,
+        tool_calls    JSONB
+    );
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: incident-agent
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      name: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: incident-agent
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          ports:
+            - containerPort: 5432
+              name: postgres
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "incident_agent"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: init-sql
+          configMap:
+            name: postgres-init-sql
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
