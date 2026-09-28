@@ -6,6 +6,15 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+# Required params.py keys per allow-listed action (tools/allowlist.yaml /
+# tools/k8s_tool.py signatures) — "namespace" deliberately excluded, it's
+# always injected server-side (FR-18), never accepted from a plan.
+REQUIRED_PARAMS: dict[str, set[str]] = {
+    "restart_pod": {"deployment"},
+    "rollback_deployment": {"deployment"},
+    "scale_deployment": {"deployment", "replicas"},
+}
+
 
 def check_plan(
     plan: list[dict[str, Any]], *, allowed_namespace: str, max_actions: int = 3
@@ -14,6 +23,11 @@ def check_plan(
     if not plan or len(plan) > max_actions:
         return f"plan has {len(plan)} actions, expected 1-{max_actions}"
     for action in plan:
-        if action.get("params", {}).get("namespace", allowed_namespace) != allowed_namespace:
+        params = action.get("params", {})
+        if params.get("namespace", allowed_namespace) != allowed_namespace:
             return f"action targets namespace outside {allowed_namespace}"
+        required = REQUIRED_PARAMS.get(action.get("name"))
+        if required is not None and not required.issubset(params):
+            missing = required - params.keys()
+            return f"action '{action.get('name')}' missing required params: {sorted(missing)}"
     return None

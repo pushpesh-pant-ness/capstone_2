@@ -74,17 +74,24 @@ async def create_incident(
     title: str,
     description: str | None,
     service_name: str | None,
-) -> UUID:
+) -> tuple[UUID, bool]:
+    """Returns (incident_id, is_new). `is_new` is False when this fingerprint
+    already has an open incident (status not in resolved/escalated) — the
+    caller MUST NOT start a second investigation against it, or a re-fired
+    alert for the same still-firing condition will race a fresh
+    investigate->...->pending_approval cycle against whatever the human
+    already decided (e.g. silently reverting an approval back to
+    pending_approval mid-remediation)."""
     query = """
         INSERT INTO incidents (alert_fingerprint, title, description, service_name, status)
         VALUES ($1, $2, $3, $4, 'detected')
         ON CONFLICT (alert_fingerprint) WHERE status NOT IN ('resolved', 'escalated')
         DO UPDATE SET title = EXCLUDED.title
-        RETURNING incident_id
+        RETURNING incident_id, (xmax = 0) AS is_new
     """
     async with _pool_or_raise().acquire() as conn:
         row = await conn.fetchrow(query, alert_fingerprint, title, description, service_name)
-        return row["incident_id"]
+        return row["incident_id"], row["is_new"]
 
 
 async def get_incident(incident_id: UUID) -> dict | None:
@@ -153,7 +160,7 @@ async def record_approval(incident_id: UUID, approved_by: str) -> None:
 
 async def record_rejection(incident_id: UUID, rejected_by: str, reason: str | None) -> None:
     await update_incident(
-        incident_id, status="escalated", approved_by=rejected_by, rejection_reason=reason,
+        incident_id, status="escalated", rejected_by=rejected_by, rejection_reason=reason,
     )
 
 

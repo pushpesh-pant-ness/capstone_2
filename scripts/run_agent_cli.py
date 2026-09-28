@@ -30,7 +30,7 @@ async def main(alert_name: str, service_name: str | None) -> None:
     await repo.init_pool()
     try:
         fingerprint = f"cli:{alert_name}:{service_name}"
-        incident_id = await repo.create_incident(
+        incident_id, _is_new = await repo.create_incident(
             alert_fingerprint=fingerprint,
             title=alert_name,
             description="Triggered via scripts/run_agent_cli.py",

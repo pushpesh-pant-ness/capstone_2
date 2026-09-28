@@ -64,7 +64,7 @@ async def main() -> None:
     await repo.init_pool()
     try:
         for seed in SEED_INCIDENTS:
-            incident_id = await repo.create_incident(
+            incident_id, _is_new = await repo.create_incident(
                 alert_fingerprint=seed["alert_fingerprint"],
                 title=seed["title"],
                 description=seed["description"],

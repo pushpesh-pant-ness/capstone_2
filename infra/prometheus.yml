@@ -6,6 +6,14 @@ scrape_configs:
       # Example if running the OTel Demo in kind with a NodePort/port-forward:
       - targets: ["host.docker.internal:9464"]
 
+  - job_name: kube-state-metrics
+    metrics_path: /metrics
+    static_configs:
+      # kube-state-metrics running in the kind cluster, bridged to the host via
+      # `kubectl port-forward -n otel-demo svc/ksm-kube-state-metrics 9101:8080`
+      # — feeds the PodCrashLooping alert rule (kube_pod_container_status_restarts_total).
+      - targets: ["host.docker.internal:9101"]
+
 rule_files:
   - /etc/prometheus/alert_rules.yml
 

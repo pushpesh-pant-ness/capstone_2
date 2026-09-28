@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 import db.repository as repo
 
@@ -15,7 +15,7 @@ def _serialize(row: dict) -> dict:
 
 
 @router.get("/incidents")
-async def list_incidents(status: str | None = None, limit: int = 50):
+async def list_incidents(status: str | None = None, limit: int = Query(default=50, ge=1, le=500)):
     incidents = await repo.list_incidents(status=status, limit=limit)
     return [_serialize(i) for i in incidents]
 

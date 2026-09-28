@@ -38,11 +38,26 @@ Edit `.env` and fill in AWS Bedrock credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRE
 docker compose -f infra/docker-compose.yaml up -d
 ```
 
+To also bring up Loki + Promtail + Prometheus + Alertmanager + Grafana (so the
+agent's investigate/RCA steps have real logs/metrics to pull, and you can
+browse them yourself):
+
+```powershell
+docker compose -f infra/docker-compose.observability.yaml up -d
+```
+
+Grafana comes up at http://localhost:3001 (anonymous Viewer access for local
+dev — host port 3000 is reserved by `infra/kind-cluster.yaml`'s control-plane
+NodePort mapping) with Prometheus + Loki pre-wired as data sources and an
+"Incident Agent Overview" dashboard (error rate, p95 latency, pod restarts,
+live logs) already provisioned — see [infra/grafana](infra/grafana).
+
 ## 4. Apply the DB migration
 
 ```powershell
 Get-Content db/migrations/0001_init.sql | docker exec -i $(docker compose -f infra/docker-compose.yaml ps -q postgres) psql -U incident_agent -d incident_agent
 Get-Content db/migrations/0002_add_escalation_reason.sql | docker exec -i $(docker compose -f infra/docker-compose.yaml ps -q postgres) psql -U incident_agent -d incident_agent
+Get-Content db/migrations/0003_add_rejected_by.sql | docker exec -i $(docker compose -f infra/docker-compose.yaml ps -q postgres) psql -U incident_agent -d incident_agent
 ```
 
 ## 5. (Optional) Seed historical incidents
@@ -54,11 +69,15 @@ python scripts/seed_historical_incidents.py
 ## 6. Run the Agent API
 
 ```powershell
-uvicorn api.main:app --reload --port 8000
+uvicorn api.main:app --reload --port 8090
 ```
 
-- API + UI: http://localhost:8000
-- Health check: http://localhost:8000/healthz
+- API + UI: http://localhost:8090
+- Health check: http://localhost:8090/healthz
+
+> Note: port 8000 is reserved by `infra/kind-cluster.yaml`'s Docker port mapping
+> (for an in-cluster agent deployment we don't use locally) — use 8090 for the
+> locally-run process, matching `infra/alertmanager.yml`'s webhook URL.
 
 ## 7. Try it out
 
@@ -91,8 +110,9 @@ scripts\teardown.ps1
 
 | Service      | Port |
 |--------------|------|
-| Agent API/UI | 8000 |
+| Agent API/UI | 8090 |
 | Postgres     | 5432 |
 | Loki         | 3100 |
 | Prometheus   | 9090 |
 | Alertmanager | 9093 |
+| Grafana      | 3001 |

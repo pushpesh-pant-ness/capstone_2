@@ -1,0 +1,12 @@
+# Local kind fire-drill overrides for the open-telemetry/opentelemetry-demo chart.
+# We already run our own Prometheus/Loki/Alertmanager/Grafana stack
+# (infra/docker-compose.observability.yaml), so disable the chart's bundled
+# copies to save resources and avoid port/scrape-target confusion.
+jaeger:
+  enabled: false
+prometheus:
+  enabled: false
+grafana:
+  enabled: false
+opensearch:
+  enabled: false

@@ -38,17 +38,17 @@
 ## 2. Track 1 — Platform & Product (Person 1)
 
 ### 2.1 Observability Stack (Hour 2–8)
-- [ ] `infra/docker-compose.observability.yaml`: Loki, Promtail, Prometheus, Alertmanager.
-- [ ] Point Promtail/Prometheus scrape configs at the monitored app (confirm it exposes `/metrics` and structured logs; add minimal instrumentation if missing).
-- [ ] Alert rules for: crash-loop pods, elevated error rate, latency SLO breach.
-- [ ] Alertmanager webhook receiver config pointing at `api/routers/alerts.py` (stub with a 200 OK first so Alertmanager config can be verified independently).
-- [ ] **Verify:** manually trigger a failure in the monitored app (bad image tag/crash) and confirm Alertmanager fires and POSTs to the stub webhook.
+- [x] `infra/docker-compose.observability.yaml`: Loki, Promtail, Prometheus, Alertmanager.
+- [x] Point Promtail/Prometheus scrape configs at the monitored app (`open-telemetry/opentelemetry-demo` deployed via Helm into `kind`, namespace `otel-demo`; kube-state-metrics added for pod-restart metrics — see RUN.md).
+- [x] Alert rules for: crash-loop pods, elevated error rate, latency SLO breach (`infra/alert_rules.yml`; `PodCrashLooping` now emits a `service` label so incidents attribute to the right deployment).
+- [x] Alertmanager webhook receiver config pointing at `api/routers/alerts.py` (real endpoint, not a stub — verified live).
+- [x] **Verify (2026-09-28):** triggered `scripts/faults/inject.py trigger podCrashLoop` against the real `recommendation` deployment in `kind`; confirmed a real CrashLoopBackOff, `PodCrashLooping` firing in Prometheus, delivery to Alertmanager, and the webhook creating/advancing a real Incident end-to-end (investigate→severity→historical→rca→plan→guardrail→approve→remediate→validate). Found and fixed several real bugs along the way (see repo memory): `tools/k8s_tool.py`'s `app=` label selector didn't match this app's actual `opentelemetry.io/name=` labels (broke `restart_pod`/`rollback_deployment`); `rollback_deployment`'s `.to_dict()` patch body used snake_case keys the API server rejects; the webhook's service-name fallback used the `job` label instead of `container`; the LLM plan could smuggle a wrong `namespace` past execution; the validation loop declared "recovered" from Prometheus error-rate alone (and on a single instant check) without any real K8s health check.
 
 ### 2.2 DB Schema & Migrations (Hour 2–5, before/parallel with 2.1)
 - [x] Finalize `db/schema.sql`: `incidents`, `audit_log` (SRS §6) with the enum status values from §6.1.
 - [x] Plain numbered `.sql` migration files run in order (`0001_init.sql`, `0002_add_escalation_reason.sql` — not auto-applied, run manually via psql).
 - [x] `db/repository.py` — get/create/update-incident and append-audit-event functions; this is the *only* module allowed to run SQL (NFR-14). Routers and `log_audit_event` call these, never raw queries.
-- [ ] `scripts/seed_historical_incidents.py` — writes 3–5 synthetic historical incidents.
+- [x] `scripts/seed_historical_incidents.py` — writes 3–5 synthetic historical incidents (run 2026-09-28, 4 incidents seeded).
 
 ### 2.3 FastAPI Intake + Approval API (Hour 5–14)
 - [x] `api/main.py` — app bootstrap, DB connection pool.
@@ -68,7 +68,7 @@
 - [x] Wire UI to the live API once Track 2's pipeline produces real plans.
 
 ### 2.6 Demo Wiring & Polish (Hour 20–24+)
-- [x] End-to-end dry run of UC-1 (SRS §8) using the real stack (CLI runner verified investigate→severity→historical→rca→plan→approve→remediating/validating).
+- [x] End-to-end **live** run of UC-1 (SRS §8) against the real stack (2026-09-28: kind + otel-demo + Prometheus/Alertmanager/Grafana + Postgres + Agent API, no stubs) — real alert fired, real incident created, real human approve/reject decisions, real `restart_pod`/`rollback_deployment` executed against the cluster, real validation loop correctly resolved vs. escalated.
 - [ ] Fallback demo video recorded.
 - [x] README "how to run the demo" steps ([RUN.md](./RUN.md)).
 
@@ -94,7 +94,7 @@
 - [x] Severity node: deterministic rule thresholds + LLM judgment blend, output includes rationale string (FR-7).
 - [x] Historical node: heuristic similarity scoring in `agent/heuristics.py` (title word overlap + same service + same severity, weighted) against stored past incidents (FR-8).
 - [x] Pass top-N similar historical incidents (prior root cause + outcome) into the RCA node as context.
-- [ ] Coordinate with Person 1 (Sync Point 2) to run `seed_historical_incidents.py` so historical retrieval has data on day one. *(script exists but hasn't been run — DB currently has no seeded historical incidents)*
+- [x] Coordinate with Person 1 (Sync Point 2) to run `seed_historical_incidents.py` so historical retrieval has data on day one. *(run 2026-09-28 — 4 historical incidents now seeded)*
 
 ### 3.4 RCA + Planning Nodes (Hour 12–16)
 - [x] RCA node: root cause summary, evidence references, confidence score 0–1 (FR-9); flags "low confidence" below threshold (routes to `escalate`).
@@ -107,7 +107,7 @@
 - [x] `tools/k8s_tool.py` — `restart_pod`, `rollback_deployment`, `scale_deployment` against the `kind` cluster via kubeconfig context (never inferred); dry-run mode for all (FR-17/18).
 - [x] Common `BaseRemediationTool` interface across adapters, extending `tools/base.py` (NFR-8).
 - [x] Re-validate every action/params against `tools/allowlist.yaml` immediately before running it — don't trust the Planning node's filtering alone (FR-15).
-- [ ] Bounded retry w/ backoff (max 2) before escalating on tool-call failure (NFR-7).
+- [x] Bounded retry w/ backoff (max 2) before escalating on tool-call failure (NFR-7) — `tools/base.py`'s `call_with_retry`, wired into `K8sTool.call`.
 - [x] Execution logging (params, start/end time, result) into `audit_log` via Track 1's `log_audit_event` helper.
 
 ### 3.6 Validation Loop (Hour 18–21)

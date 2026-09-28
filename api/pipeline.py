@@ -19,7 +19,7 @@ import yaml
 import db.repository as repo
 from agent.graph import graph
 from agent.state import AgentState
-from tools.k8s_tool import k8s_tool
+from tools.k8s_tool import is_crash_looping, k8s_tool
 from tools.prometheus_tool import prometheus_tool
 
 logger = logging.getLogger("incident-agent")
@@ -126,7 +126,10 @@ async def run_remediation_and_validation(incident_id: UUID) -> None:
             result = {"error": f"action '{action.get('name')}' is not on tools/allowlist.yaml — refused"}
         else:
             try:
-                params = {"namespace": APP_NAMESPACE, **action.get("params", {})}
+                # namespace always comes from trusted server config, never the
+                # LLM-produced plan (FR-18: never inferred) — params spread
+                # first so it can't clobber the namespace key.
+                params = {**action.get("params", {}), "namespace": APP_NAMESPACE}
                 result = k8s_tool.call(action["name"], dry_run=_dry_run_enabled(), **params)
             except Exception as exc:  # noqa: BLE001
                 result = {"error": str(exc)}
@@ -154,16 +157,28 @@ async def _validate_recovery(incident: dict[str, Any]) -> dict[str, Any]:
     loop = asyncio.get_running_loop()
     deadline = loop.time() + VALIDATION_WINDOW_SECONDS
     details: dict[str, Any] = {}
+    # FR-19/20: recovery must be *sustained* for the whole window, not just true
+    # on the first poll (e.g. a just-restarted pod hasn't had time to
+    # crash-loop again yet), and needs at least one real confirming reading —
+    # a window where every poll errored out is not evidence of recovery.
+    saw_healthy_check = False
     recovered = False
     while loop.time() < deadline:
         try:
             error_rate = prometheus_tool.error_rate(service)
-            details = {"error_rate": error_rate, "baseline_error_rate": baseline_error_rate}
-            if error_rate <= max(0.01, baseline_error_rate * 0.2):
-                recovered = True
+            crash_looping = is_crash_looping(service, APP_NAMESPACE)
+            details = {
+                "error_rate": error_rate, "baseline_error_rate": baseline_error_rate,
+                "crash_looping": crash_looping,
+            }
+            if crash_looping or error_rate > max(0.01, baseline_error_rate * 0.2):
+                recovered = False
                 break
-        except Exception as exc:  # noqa: BLE001
+            saw_healthy_check = True
+            recovered = True
+        except Exception as exc:  # noqa: BLE001 - transient monitoring hiccup, keep polling
             details = {"error": str(exc)}
         await asyncio.sleep(VALIDATION_POLL_SECONDS)
 
-    return {"recovered": recovered, "evidence": details}
+    return {"recovered": recovered and saw_healthy_check, "evidence": details}
+

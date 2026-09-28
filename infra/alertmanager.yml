@@ -8,7 +8,15 @@ route:
 receivers:
   - name: incident-agent-webhook
     webhook_configs:
-      # Agent Intake API (api/routers/alerts.py). Adjust host if the Agent API
-      # doesn't run on the docker-compose network under this name.
-      - url: "http://host.docker.internal:8000/webhooks/alertmanager"
+      # Agent Intake API (api/routers/alerts.py). Host port 8000 is already
+      # claimed by the kind cluster's Docker port mapping (infra/kind-cluster.yaml,
+      # reserved for an in-cluster agent deployment we don't use locally), so the
+      # locally-run `uvicorn` process listens on 8090 instead — see RUN.md.
+      - url: "http://host.docker.internal:8090/webhooks/alertmanager"
         send_resolved: false
+        # SRS §4.3: authenticated webhook — must match the API's
+        # ALERTMANAGER_WEBHOOK_TOKEN env var. Replace with a real secret before
+        # exposing this endpoint beyond a local trusted network.
+        http_config:
+          authorization:
+            credentials: "changeme-local-dev-token"

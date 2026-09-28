@@ -132,9 +132,13 @@ async function refreshIncidentDetail(incidentId) {
 
   if (["resolved", "escalated"].includes(incident.status)) {
     outcomePanel.hidden = false;
-    const reasonLine = incident.escalation_reason ? `Escalation reason: ${incident.escalation_reason}\n` : "";
+    const lines = [];
+    if (incident.rejected_by) lines.push(`Rejected by: ${incident.rejected_by}`);
+    if (incident.rejection_reason) lines.push(`Rejection reason: ${incident.rejection_reason}`);
+    if (incident.escalation_reason) lines.push(`Escalation reason: ${incident.escalation_reason}`);
+    const reasonBlock = lines.length ? `${lines.join("\n")}\n` : "";
     document.getElementById("outcome-text").textContent =
-      `Status: ${incident.status}\n${reasonLine}${JSON.stringify(incident.validation_result, null, 2)}`;
+      `Status: ${incident.status}\n${reasonBlock}${JSON.stringify(incident.validation_result, null, 2)}`;
   } else {
     outcomePanel.hidden = true;
   }

@@ -29,6 +29,7 @@ groups:
         for: 1m
         labels:
           severity: critical
+          service: "{{ $labels.container }}"
         annotations:
           summary: "Pod {{ $labels.pod }} is crash-looping"
           description: "Container {{ $labels.container }} in pod {{ $labels.pod }} restarted more than 3 times in 10 minutes."
