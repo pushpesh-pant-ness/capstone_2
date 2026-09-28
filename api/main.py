@@ -5,8 +5,11 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")  # no-op if the file is absent
 
 import db.repository as repo
 

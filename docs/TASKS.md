@@ -22,14 +22,14 @@
 
 ## 1. Phase 0 — Shared Setup (Hour 0–2, do together)
 
-- [ ] Confirm the answer to SRS §10.B's remaining open question (Bedrock model ID) — or default to Claude 3.5 Sonnet on Bedrock. Monitored app is already confirmed as `open-telemetry/opentelemetry-demo` (see [DFD.md](./DFD.md)).
-- [ ] Create repo skeleton per [BUILD_PLAN.md §3](./BUILD_PLAN.md#3-proposed-repository-structure) (`agent/`, `tools/`, `api/`, `ui/`, `db/`, `infra/`, `tests/`, `scripts/`).
+- [x] Confirm the answer to SRS §10.B's remaining open question (Bedrock model ID) — resolved to `amazon.nova-pro-v1:0` (Claude 3.x retired on this account). Monitored app is already confirmed as `open-telemetry/opentelemetry-demo` (see [DFD.md](./DFD.md)).
+- [x] Create repo skeleton per [BUILD_PLAN.md §3](./BUILD_PLAN.md#3-proposed-repository-structure) (`agent/`, `tools/`, `api/`, `ui/`, `db/`, `infra/`, `tests/`, `scripts/`).
 - [ ] Both: install Docker, `kind`/`minikube`, `kubectl`; Person 2 creates the `kind` cluster (`infra/kind-config.yaml`) and confirms `kubectl config current-context` points at it.
 - [ ] Person 1: stand up Alertmanager as new infra (the monitored app doesn't ship one) pointed at its existing Prometheus; confirm it can fire a test alert.
-- [ ] Person 2: run an AWS Bedrock smoke test (single `InvokeModel` call) to confirm model access/region/credentials work.
-- [ ] Person 1: bring up Postgres via Docker Compose; apply `db/schema.sql` v0 (empty `incidents`, `audit_log` tables per SRS §6).
-- [ ] Agree the **Incident JSON contract** together (SRS §6.1) — write it into `agent/state.py` (Track 2) and `api/models.py` (Track 1) identically.
-- [ ] Agree the **Tool Allow-list contract** (SRS §7) as a shared `tools/allowlist.yaml` both tracks read from.
+- [x] Person 2: run an AWS Bedrock smoke test (single `InvokeModel`/`converse` call) to confirm model access/region/credentials work.
+- [x] Person 1: bring up Postgres via Docker Compose; apply `db/schema.sql` v0 (empty `incidents`, `audit_log` tables per SRS §6).
+- [x] Agree the **Incident JSON contract** together (SRS §6.1) — written into `agent/state.py` (Track 2) and `api/models.py` (Track 1) identically.
+- [x] Agree the **Tool Allow-list contract** (SRS §7) as a shared `tools/allowlist.yaml` both tracks read from.
 
 **Definition of done:** both people can run `docker compose up` and get Postgres + an empty `kind` cluster; both have working Bedrock credentials; the Incident schema and allow-list file are committed and agreed.
 
@@ -45,80 +45,80 @@
 - [ ] **Verify:** manually trigger a failure in the monitored app (bad image tag/crash) and confirm Alertmanager fires and POSTs to the stub webhook.
 
 ### 2.2 DB Schema & Migrations (Hour 2–5, before/parallel with 2.1)
-- [ ] Finalize `db/schema.sql`: `incidents`, `audit_log` (SRS §6) with the enum status values from §6.1.
-- [ ] Plain numbered `.sql` migration files run in order.
-- [ ] `db/repository.py` — get/create/update-incident and append-audit-event functions; this is the *only* module allowed to run SQL (NFR-14). Routers and `log_audit_event` call these, never raw queries.
+- [x] Finalize `db/schema.sql`: `incidents`, `audit_log` (SRS §6) with the enum status values from §6.1.
+- [x] Plain numbered `.sql` migration files run in order (`0001_init.sql`, `0002_add_escalation_reason.sql` — not auto-applied, run manually via psql).
+- [x] `db/repository.py` — get/create/update-incident and append-audit-event functions; this is the *only* module allowed to run SQL (NFR-14). Routers and `log_audit_event` call these, never raw queries.
 - [ ] `scripts/seed_historical_incidents.py` — writes 3–5 synthetic historical incidents.
 
 ### 2.3 FastAPI Intake + Approval API (Hour 5–14)
-- [ ] `api/main.py` — app bootstrap, DB connection pool.
-- [ ] `api/routers/alerts.py` — `POST /webhooks/alertmanager`: validate payload, create/correlate Incident row by Alertmanager's own `fingerprint` field, respond within 5s.
-- [ ] `api/routers/incidents.py` — `GET /incidents`, `GET /incidents/{id}` (full detail incl. evidence/RCA/plan/history).
-- [ ] `api/routers/approvals.py` — `POST /incidents/{id}/approve`, `POST /incidents/{id}/reject`; record actor, timestamp, comment; on reject → status `escalated`, no auto-retry.
-- [ ] Wire the endpoint Track 2's graph calls to hand off a finished plan (`status=pending_approval`) and the endpoint Track 2's Executor/Validator call to report execution/validation results back.
-- [ ] **Unblock with a stub:** until Track 2's graph exists, use a script that POSTs a fake RCA+plan payload to exercise the approval endpoints end-to-end.
+- [x] `api/main.py` — app bootstrap, DB connection pool.
+- [x] `api/routers/alerts.py` — `POST /webhooks/alertmanager`: validate payload, create/correlate Incident row by Alertmanager's own `fingerprint` field, respond within 5s.
+- [x] `api/routers/incidents.py` — `GET /incidents`, `GET /incidents/{id}` (full detail incl. evidence/RCA/plan/history).
+- [x] `api/routers/approvals.py` — `POST /incidents/{id}/approve`, `POST /incidents/{id}/reject`; record actor, timestamp, comment; on reject → status `escalated`, no auto-retry.
+- [x] Wire the endpoint Track 2's graph calls to hand off a finished plan (`status=pending_approval`) and the endpoint Track 2's Executor/Validator call to report execution/validation results back.
+- [ ] **Unblock with a stub:** until Track 2's graph exists, use a script that POSTs a fake RCA+plan payload to exercise the approval endpoints end-to-end. *(moot — real graph exists and is wired end-to-end)*
 
 ### 2.4 Audit Logging (Hour 10–16)
-- [ ] Shared `log_audit_event(incident_id, actor, action_type, payload)` helper that appends to `audit_log`, append-only, secrets redacted.
-- [ ] Call it from every state transition, approval/rejection; expose `GET /incidents/{id}/audit`.
+- [x] Shared `log_audit_event(incident_id, actor, action_type, payload)` helper that appends to `audit_log`, append-only, secrets redacted.
+- [x] Call it from every state transition, approval/rejection; expose `GET /incidents/{id}/audit`.
 
 ### 2.5 Approval UI (Hour 14–20)
-- [ ] Minimal Streamlit UI: incident list (status, severity, service); incident detail (evidence, RCA rationale + confidence, historical matches, plan with risk levels, Approve/Reject with comment box).
-- [ ] Audit timeline view for an incident.
-- [ ] Wire UI to the live API once Track 2's pipeline produces real plans.
+- [x] Minimal HTML/JS UI (not Streamlit): incident list (status, severity, service); incident detail (evidence, RCA rationale + confidence, historical matches, plan with risk levels, Approve/Reject with comment box).
+- [x] Audit timeline view for an incident.
+- [x] Wire UI to the live API once Track 2's pipeline produces real plans.
 
 ### 2.6 Demo Wiring & Polish (Hour 20–24+)
-- [ ] End-to-end dry run of UC-1 (SRS §8) using the real stack.
+- [x] End-to-end dry run of UC-1 (SRS §8) using the real stack (CLI runner verified investigate→severity→historical→rca→plan→approve→remediating/validating).
 - [ ] Fallback demo video recorded.
-- [ ] README "how to run the demo" steps.
+- [x] README "how to run the demo" steps ([RUN.md](./RUN.md)).
 
 ---
 
 ## 3. Track 2 — Agent & Execution (Person 2)
 
 ### 3.1 Agent State & Graph Skeleton (Hour 2–6)
-- [ ] `agent/state.py` — Incident state schema (pydantic/TypedDict) matching the shared contract from Phase 0.
-- [ ] `agent/graph.py` — LangGraph wiring: `Investigate → Severity → Historical → RCA → Plan`, each node a **stub/deterministic fake** first so the graph runs end-to-end immediately.
-- [ ] `agent/llm_client.py` — thin Bedrock wrapper behind a common `analyze(...)` contract; on call failure/timeout/unparseable output, fall back to `agent/heuristics.py` instead of raising.
-- [ ] `agent/heuristics.py` — deterministic rule-based RCA/plan fallback (e.g., recent deploy + latency → rollback; OOM signal → scale; crash-loop → restart) plus the historical similarity scorer (title/service/severity overlap).
-- [ ] `scripts/run_agent_cli.py` — run one incident through the graph standalone (no FastAPI/UI needed) for fast iteration and as a demo-rehearsal safety net.
+- [x] `agent/state.py` — Incident state schema (pydantic/TypedDict) matching the shared contract from Phase 0.
+- [x] `agent/graph.py` — LangGraph wiring, now beyond the original skeleton with the multi-agent handoff (`investigate → assess_severity → historical → supervisor → auto_plan|rca → plan → guardrail → escalate/END`) per [AGENTS.md](./AGENTS.md).
+- [x] `agent/llm_client.py` — thin Bedrock wrapper behind a common `analyze(...)` contract; on call failure/timeout/unparseable output, falls back to `agent/heuristics.py` instead of raising.
+- [x] `agent/heuristics.py` — deterministic rule-based RCA/plan fallback (e.g., recent deploy + latency → rollback; OOM signal → scale; crash-loop → restart) plus the historical similarity scorer (title/service/severity overlap).
+- [x] `scripts/run_agent_cli.py` — run one incident through the graph standalone (no FastAPI/UI needed) for fast iteration and as a demo-rehearsal safety net.
 
 ### 3.2 Investigate Node (Hour 6–9)
-- [ ] `tools/base.py` — common adapter base (`name`, a live call method). Every tool below subclasses this.
-- [ ] `tools/loki_tool.py` — LogQL query wrapper (FR-4).
-- [ ] `tools/prometheus_tool.py` — PromQL query wrapper for error rate/latency/resource metrics (FR-4).
-- [ ] Deployment/version metadata fetch (last image tag/commit) (FR-5).
-- [ ] Wire real Bedrock call in the Investigate node to summarize gathered context (untrusted log content must be clearly quoted, never concatenated raw into an instruction-bearing prompt, per NFR-4).
+- [x] `tools/base.py` — common adapter base (`name`, a live call method). Every tool below subclasses this.
+- [x] `tools/loki_tool.py` — LogQL query wrapper (FR-4).
+- [x] `tools/prometheus_tool.py` — PromQL query wrapper for error rate/latency/resource metrics (FR-4).
+- [x] Deployment/version metadata fetch (last image tag/commit) (FR-5).
+- [x] Wire real Bedrock call in the Investigate node to summarize gathered context (untrusted log content must be clearly quoted, never concatenated raw into an instruction-bearing prompt, per NFR-4).
 
 ### 3.3 Severity + Historical (Hour 9–12)
-- [ ] Severity node: deterministic rule thresholds + LLM judgment blend, output includes rationale string (FR-7).
-- [ ] Historical node: heuristic similarity scoring in `agent/heuristics.py` (title word overlap + same service + same severity, weighted) against stored past incidents (FR-8).
-- [ ] Pass top-N similar historical incidents (prior root cause + outcome) into the RCA node as context.
-- [ ] Coordinate with Person 1 (Sync Point 2) to run `seed_historical_incidents.py` so historical retrieval has data on day one.
+- [x] Severity node: deterministic rule thresholds + LLM judgment blend, output includes rationale string (FR-7).
+- [x] Historical node: heuristic similarity scoring in `agent/heuristics.py` (title word overlap + same service + same severity, weighted) against stored past incidents (FR-8).
+- [x] Pass top-N similar historical incidents (prior root cause + outcome) into the RCA node as context.
+- [ ] Coordinate with Person 1 (Sync Point 2) to run `seed_historical_incidents.py` so historical retrieval has data on day one. *(script exists but hasn't been run — DB currently has no seeded historical incidents)*
 
 ### 3.4 RCA + Planning Nodes (Hour 12–16)
-- [ ] RCA node: root cause summary, evidence references, confidence score 0–1 (FR-9); flag "low confidence" below threshold.
-- [ ] Planning node: generate plan using **only** actions from `tools/allowlist.yaml`; each action has target, name, params, risk, expected effect (FR-10).
-- [ ] Robust JSON extraction from LLM output (handle clean JSON, markdown-fenced blocks, and JSON surrounded by prose) before allow-list validation runs (FR-11).
-- [ ] Reject/flag any out-of-catalog action before it ever reaches the API.
-- [ ] Versioned prompt templates in `agent/prompts/`.
+- [x] RCA node: root cause summary, evidence references, confidence score 0–1 (FR-9); flags "low confidence" below threshold (routes to `escalate`).
+- [x] Planning node: generate plan using **only** actions from `tools/allowlist.yaml`; each action has target, name, params, risk, expected effect (FR-10).
+- [x] Robust JSON extraction from LLM output (handle clean JSON, markdown-fenced blocks, and JSON surrounded by prose) before allow-list validation runs (FR-11).
+- [x] Reject/flag any out-of-catalog action before it ever reaches the API (`agent/guardrail.py` `check_plan`).
+- [x] Versioned prompt templates in `agent/prompts/`.
 
 ### 3.5 K8s Remediation (Hour 14–20)
-- [ ] `tools/k8s_tool.py` — `restart_pod`, `rollback_deployment`, `scale_deployment` against the `kind` cluster via kubeconfig context (never inferred); dry-run mode for all (FR-17/18).
-- [ ] Common `BaseRemediationTool` interface across adapters, extending `tools/base.py` (NFR-8).
-- [ ] Re-validate every action/params against `tools/allowlist.yaml` immediately before running it — don't trust the Planning node's filtering alone (FR-15).
+- [x] `tools/k8s_tool.py` — `restart_pod`, `rollback_deployment`, `scale_deployment` against the `kind` cluster via kubeconfig context (never inferred); dry-run mode for all (FR-17/18).
+- [x] Common `BaseRemediationTool` interface across adapters, extending `tools/base.py` (NFR-8).
+- [x] Re-validate every action/params against `tools/allowlist.yaml` immediately before running it — don't trust the Planning node's filtering alone (FR-15).
 - [ ] Bounded retry w/ backoff (max 2) before escalating on tool-call failure (NFR-7).
-- [ ] Execution logging (params, start/end time, result) into `audit_log` via Track 1's `log_audit_event` helper.
+- [x] Execution logging (params, start/end time, result) into `audit_log` via Track 1's `log_audit_event` helper.
 
 ### 3.6 Validation Loop (Hour 18–21)
-- [ ] Poll Prometheus + K8s readiness/liveness on a timer (default 15s interval / 3min window, configurable) (FR-19).
-- [ ] Compare against pre-incident baseline captured during Investigate.
-- [ ] On success → `resolved`; on failure at window end → `escalated`, no silent infinite retry (FR-20).
-- [ ] On resolve, add the incident to the historical store used by §3.3 (FR-21).
+- [x] Poll Prometheus + K8s readiness/liveness on a timer (default 15s interval / 3min window, configurable) (FR-19).
+- [x] Compare against pre-incident baseline captured during Investigate.
+- [x] On success → `resolved`; on failure at window end → `escalated`, no silent infinite retry (FR-20).
+- [ ] On resolve, add the incident to the historical store used by §3.3 (FR-21). *(resolved incidents are queryable via `list_resolved_incidents`, but no explicit "add to historical store" step exists beyond the incident row itself already being there)*
 
 ### 3.7 Integration Testing (Hour 18–24+)
-- [ ] Run UC-1 and UC-2 (SRS §8) against the real API/DB/UI built by Track 1.
-- [ ] Fix any contract drift between agent output and API/UI expectations.
+- [x] Run UC-1 (SRS §8) against the real API/DB/UI built by Track 1 (verified via CLI runner). UC-2 not separately re-verified.
+- [x] Fix any contract drift between agent output and API/UI expectations (namespace param bug, UUID JSON-serialization bug, node-id/state-key collision — all fixed).
 
 ---
 

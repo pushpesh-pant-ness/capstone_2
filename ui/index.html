@@ -2,62 +2,97 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Incident Remediation Agent — Approval Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <header>
-    <h1>Autonomous Post-Deployment Incident &amp; Remediation Agent</h1>
-  </header>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">◆</span>
+        <div class="brand-text">
+          <h1>Incident Remediation Agent</h1>
+          <p class="subtitle">Autonomous Post-Deployment Incident &amp; Remediation Dashboard</p>
+        </div>
+      </div>
+      <div class="topbar-status">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span>Live</span>
+      </div>
+    </header>
 
-  <div class="layout">
-    <main>
-      <section id="incident-list-section">
-        <h2>Incidents</h2>
-        <table id="incident-table">
-          <thead>
-            <tr><th>Alert</th><th>Service</th><th>Severity</th><th>Status</th><th>Detected</th></tr>
-          </thead>
-          <tbody id="incident-table-body"></tbody>
-        </table>
-      </section>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2>Incidents</h2>
+          <span id="incident-count" class="count-badge">0</span>
+        </div>
+        <input id="incident-search" class="search-input" type="search" placeholder="Filter by title or service…" autocomplete="off" />
+        <div id="incident-list" class="incident-list">
+          <div class="list-empty">Loading incidents…</div>
+        </div>
+      </aside>
 
-      <section id="incident-detail-section" hidden>
-        <h2 id="detail-title">Incident</h2>
-
-        <div class="panel">
-          <h3>Evidence</h3>
-          <pre id="evidence-text"></pre>
+      <main class="detail">
+        <div id="empty-state" class="empty-state">
+          <div class="empty-icon" aria-hidden="true">🗂</div>
+          <h3>No incident selected</h3>
+          <p>Choose an incident from the list to view evidence, root cause analysis, and the remediation plan.</p>
         </div>
 
-        <div class="panel">
-          <h3>Root Cause Analysis</h3>
-          <p id="rca-text"></p>
-        </div>
+        <section id="incident-detail-section" hidden>
+          <div class="detail-header">
+            <div>
+              <h2 id="detail-title">Incident</h2>
+              <div id="detail-meta" class="detail-meta"></div>
+            </div>
+          </div>
 
-        <div class="panel">
-          <h3>Similar Past Incidents</h3>
-          <ul id="similar-list"></ul>
-        </div>
+          <div class="panel">
+            <h3>Evidence</h3>
+            <pre id="evidence-text" class="code-block"></pre>
+          </div>
 
-        <div id="approval-panel" class="panel" hidden>
-          <h3>Proposed Remediation Plan — Approval Required</h3>
-          <pre id="plan-text"></pre>
-          <input id="actor-name" placeholder="your name" />
-          <input id="reason-text" placeholder="optional comment / rejection reason" />
-          <button id="approve-btn">Approve &amp; Remediate</button>
-          <button id="reject-btn" class="secondary">Reject / Escalate</button>
-        </div>
+          <div class="panel">
+            <h3>Root Cause Analysis</h3>
+            <p id="rca-text" class="rca-text"></p>
+          </div>
 
-        <div id="outcome-panel" class="panel" hidden>
-          <h3>Outcome</h3>
-          <p id="outcome-text"></p>
-        </div>
+          <div class="panel">
+            <h3>Similar Past Incidents</h3>
+            <ul id="similar-list" class="similar-list"></ul>
+          </div>
 
-        <h3>Audit Log</h3>
-        <div id="audit-log"></div>
-      </section>
-    </main>
+          <div id="approval-panel" class="panel approval-panel" hidden>
+            <h3><span class="warn-icon" aria-hidden="true">&#9888;</span> Proposed Remediation Plan — Approval Required</h3>
+            <pre id="plan-text" class="code-block"></pre>
+            <div class="approval-form">
+              <div class="approval-inputs">
+                <input id="actor-name" placeholder="Your name" />
+                <input id="reason-text" placeholder="Optional comment / rejection reason" />
+              </div>
+              <div class="approval-actions">
+                <button id="approve-btn">Approve &amp; Remediate</button>
+                <button id="reject-btn" class="secondary">Reject / Escalate</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="outcome-panel" class="panel" hidden>
+            <h3>Outcome</h3>
+            <p id="outcome-text"></p>
+          </div>
+
+          <div class="panel">
+            <h3>Audit Log</h3>
+            <div id="audit-log" class="audit-log"></div>
+          </div>
+        </section>
+      </main>
+    </div>
   </div>
 
 <script src="/app.js"></script>

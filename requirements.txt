@@ -2,6 +2,7 @@ fastapi==0.115.0
 uvicorn[standard]
 asyncpg
 pydantic
+python-dotenv
 langgraph==0.2.45
 langchain-core==0.3.15
 boto3==1.35.50

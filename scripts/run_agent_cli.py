@@ -16,7 +16,10 @@ import sys
 from pathlib import Path
 from uuid import UUID
 
+from dotenv import load_dotenv
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # repo root on sys.path
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")  # no-op if the file is absent
 
 import db.repository as repo
 from agent.state import AgentState
