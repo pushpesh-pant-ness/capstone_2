@@ -68,7 +68,10 @@ async def run_investigation(incident_id: UUID, initial_state: AgentState) -> Non
     try:
         async for update in graph.astream(initial_state, stream_mode="updates"):
             for node_name, partial in update.items():
-                state.update(partial)
+                if partial is None:  # e.g. supervisor's routing-only no-op
+                    partial = {}
+                else:
+                    state.update(partial)
                 # node id is "assess_severity", not "severity" (collides with the state key)
                 action_type = "llm_call" if node_name in ("assess_severity", "rca", "plan") else "tool_call"
                 await repo.log_audit_event(incident_id, "agent", action_type, {"node": node_name, "output": partial})

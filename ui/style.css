@@ -24,6 +24,10 @@
 
 * { box-sizing: border-box; }
 
+/* Author class rules like .empty-state{display:flex} would otherwise beat the
+   UA [hidden] rule since author styles always win regardless of specificity. */
+[hidden] { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -251,6 +255,27 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 .similar-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
 .similar-list li { margin-bottom: 4px; }
 .similar-list:empty::before { content: "None found"; color: var(--muted-2); font-style: italic; }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.tab-btn {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 8px 4px;
+  margin-right: 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.tab-btn:hover { background: transparent; color: var(--text); }
+.tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
 
 /* Badges */
 .badge {

@@ -6,7 +6,7 @@ filter already inside plan.py — defense in depth (FR-11, FR-15).
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Optional
 
 from langgraph.graph import END
 
@@ -17,9 +17,11 @@ from ..state import AgentState
 APP_NAMESPACE = os.environ.get("APP_NAMESPACE", "default")
 
 
-async def guardrail(state: AgentState) -> dict[str, Any]:
+async def guardrail(state: AgentState) -> Optional[dict[str, Any]]:
+    # None (not {}) when the plan passes — LangGraph rejects an empty dict as
+    # an invalid node update.
     reason = check_plan(state.get("remediation_plan") or [], allowed_namespace=APP_NAMESPACE)
-    return {"escalation_reason": reason} if reason else {}
+    return {"escalation_reason": reason} if reason else None
 
 
 def route_after_guardrail(state: AgentState) -> str:

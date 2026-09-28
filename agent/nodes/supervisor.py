@@ -31,10 +31,11 @@ def find_auto_plan_candidate(state: AgentState) -> Optional[dict[str, Any]]:
     return None
 
 
-async def supervisor(state: AgentState) -> dict[str, Any]:
-    # No-op — routing happens in route_after_supervisor so the decision still
-    # shows up as its own step in the audit log, same as every other node.
-    return {}
+async def supervisor(state: AgentState) -> Optional[dict[str, Any]]:
+    # No-op — routing happens in route_after_supervisor. Must return None, not
+    # {}: LangGraph treats an empty dict as an invalid update (no key changed)
+    # and raises InvalidUpdateError, whereas None is a legitimate "skip write".
+    return None
 
 
 def route_after_supervisor(state: AgentState) -> str:

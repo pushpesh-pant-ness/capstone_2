@@ -51,21 +51,6 @@
             </div>
           </div>
 
-          <div class="panel">
-            <h3>Evidence</h3>
-            <pre id="evidence-text" class="code-block"></pre>
-          </div>
-
-          <div class="panel">
-            <h3>Root Cause Analysis</h3>
-            <p id="rca-text" class="rca-text"></p>
-          </div>
-
-          <div class="panel">
-            <h3>Similar Past Incidents</h3>
-            <ul id="similar-list" class="similar-list"></ul>
-          </div>
-
           <div id="approval-panel" class="panel approval-panel" hidden>
             <h3><span class="warn-icon" aria-hidden="true">&#9888;</span> Proposed Remediation Plan — Approval Required</h3>
             <pre id="plan-text" class="code-block"></pre>
@@ -86,9 +71,33 @@
             <p id="outcome-text"></p>
           </div>
 
-          <div class="panel">
-            <h3>Audit Log</h3>
-            <div id="audit-log" class="audit-log"></div>
+          <div class="tabs" role="tablist">
+            <button class="tab-btn active" data-tab="details" role="tab" aria-selected="true">Details</button>
+            <button class="tab-btn" data-tab="timeline" role="tab" aria-selected="false">Timeline</button>
+          </div>
+
+          <div id="tab-details" class="tab-panel">
+            <div class="panel">
+              <h3>Evidence</h3>
+              <pre id="evidence-text" class="code-block"></pre>
+            </div>
+
+            <div class="panel">
+              <h3>Root Cause Analysis</h3>
+              <p id="rca-text" class="rca-text"></p>
+            </div>
+
+            <div class="panel">
+              <h3>Similar Past Incidents</h3>
+              <ul id="similar-list" class="similar-list"></ul>
+            </div>
+          </div>
+
+          <div id="tab-timeline" class="tab-panel" hidden>
+            <div class="panel">
+              <h3>Audit Log</h3>
+              <div id="audit-log" class="audit-log"></div>
+            </div>
           </div>
         </section>
       </main>

@@ -181,6 +181,18 @@ document.getElementById("incident-search").addEventListener("input", (e) => {
   renderIncidentList();
 });
 
+for (const btn of document.querySelectorAll(".tab-btn")) {
+  btn.addEventListener("click", () => {
+    for (const b of document.querySelectorAll(".tab-btn")) {
+      b.classList.toggle("active", b === btn);
+      b.setAttribute("aria-selected", String(b === btn));
+    }
+    for (const panel of document.querySelectorAll(".tab-panel")) {
+      panel.hidden = panel.id !== `tab-${btn.dataset.tab}`;
+    }
+  });
+}
+
 loadIncidents();
 setInterval(loadIncidents, 5000);
 
