@@ -10,12 +10,13 @@ through the same RCA+Plan LLM calls:
     rca         -> plan        (otherwise)
     auto_plan / plan -> guardrail   (deterministic plan sanity check, defense in depth)
     guardrail   -> escalate    (guardrail rejects the plan)
-    guardrail   -> END         (plan is fit to show a human)
-    escalate    -> END
+    guardrail   -> END         (plan is fit to show a human)   <- HITL gate
+    escalate    -> END                                         <- HITL gate
 
-Remediation/Validation are NOT graph nodes — they only run after a human
-approval decision, driven by api/routers/approvals.py (FR-12..15), so there is
-nothing to interrupt/resume here.
+HITL (human-in-the-loop) is NOT a graph node — the graph's only job is to
+reach END with either a pending_approval plan or an escalation_reason.
+Remediation/Validation only run after a human approves via
+api/routers/approvals.py (FR-12..15); the graph itself never resumes.
 
 agent/ never imports api/ or db/ (NFR-14) — historical candidates are fetched
 by the caller and placed on the state before invoking this graph.
@@ -36,31 +37,53 @@ from .nodes.supervisor import route_after_supervisor, supervisor
 from .state import AgentState
 
 
+# Node ids as constants: avoids repeating/mistyping the same string across
+# add_node/add_edge calls. ASSESS_SEVERITY can't be named "severity" — that
+# collides with the AgentState "severity" key.
+INVESTIGATE = "investigate"
+ASSESS_SEVERITY = "assess_severity"
+HISTORICAL = "historical"
+SUPERVISOR = "supervisor"
+AUTO_PLAN = "auto_plan"
+RCA = "rca"
+PLAN = "plan"
+GUARDRAIL = "guardrail"
+ESCALATE = "escalate"
+
+
 def build_graph():
     builder = StateGraph(AgentState)
-    builder.add_node("investigate", investigate)
-    # node id can't be "severity" — it collides with the AgentState "severity" key
-    builder.add_node("assess_severity", severity)
-    builder.add_node("historical", historical)
-    builder.add_node("supervisor", supervisor)
-    builder.add_node("auto_plan", auto_plan)
-    builder.add_node("rca", rca)
-    builder.add_node("plan", plan)
-    builder.add_node("guardrail", guardrail)
-    builder.add_node("escalate", escalate)
+    builder.add_node(INVESTIGATE, investigate)
+    builder.add_node(ASSESS_SEVERITY, severity)
+    builder.add_node(HISTORICAL, historical)
+    builder.add_node(SUPERVISOR, supervisor)
+    builder.add_node(AUTO_PLAN, auto_plan)
+    builder.add_node(RCA, rca)
+    builder.add_node(PLAN, plan)
+    builder.add_node(GUARDRAIL, guardrail)
+    builder.add_node(ESCALATE, escalate)
 
-    builder.add_edge(START, "investigate")
-    builder.add_edge("investigate", "assess_severity")
-    builder.add_edge("assess_severity", "historical")
-    builder.add_edge("historical", "supervisor")
+    # Deterministic evidence-gathering chain — identical for every incident.
+    builder.add_edge(START, INVESTIGATE)
+    builder.add_edge(INVESTIGATE, ASSESS_SEVERITY)
+    builder.add_edge(ASSESS_SEVERITY, HISTORICAL)
+    builder.add_edge(HISTORICAL, SUPERVISOR)
+
+    # Supervisor: replay a trusted historical plan, or fall through to RCA.
     builder.add_conditional_edges(
-        "supervisor", route_after_supervisor, {"auto_plan": "auto_plan", "rca": "rca"}
+        SUPERVISOR, route_after_supervisor, {AUTO_PLAN: AUTO_PLAN, RCA: RCA}
     )
-    builder.add_conditional_edges("rca", route_after_rca, {"escalate": "escalate", "plan": "plan"})
-    builder.add_edge("auto_plan", "guardrail")
-    builder.add_edge("plan", "guardrail")
-    builder.add_conditional_edges("guardrail", route_after_guardrail, {"escalate": "escalate", END: END})
-    builder.add_edge("escalate", END)
+    # RCA: hand off to a human when confidence is too low to plan against.
+    builder.add_conditional_edges(RCA, route_after_rca, {ESCALATE: ESCALATE, PLAN: PLAN})
+
+    # Both planners converge on the same deterministic guardrail check.
+    builder.add_edge(AUTO_PLAN, GUARDRAIL)
+    builder.add_edge(PLAN, GUARDRAIL)
+    # END here = pending_approval, waiting on the HITL gate in api/routers/approvals.py.
+    builder.add_conditional_edges(
+        GUARDRAIL, route_after_guardrail, {ESCALATE: ESCALATE, END: END}
+    )
+    builder.add_edge(ESCALATE, END)  # END here = escalated, also waiting on a human
 
     return builder.compile()
 
