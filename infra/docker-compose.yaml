@@ -1,8 +1,21 @@
-# Postgres via Docker Compose (BUILD_PLAN.md Phase 0). The Agent/API connect
-# using DATABASE_URL (see db/repository.py); apply db/migrations/ once the
-# container is up:
+# Single Docker Compose stack for all local infra (BUILD_PLAN.md Phase 0/1):
+# Postgres + OpenTelemetry Collector + Loki/Promtail + Prometheus + Alertmanager
+# + Grafana. Kubernetes (kind) remains separate — see infra/kind-cluster.yaml
+# and RUN.md — this file only covers Docker Compose-managed services.
+#
+# Usage:
 #   docker compose -f infra/docker-compose.yaml up -d
 #   psql "$DATABASE_URL" -f db/migrations/0001_init.sql
+#
+# Reference — service ports:
+#   Postgres              5432
+#   OTel Collector OTLP   4317 (gRPC), 4318 (HTTP)
+#   OTel Collector health 13133 (health_check), 55679 (zpages)
+#   OTel Collector metrics 8888 (self), 8889 (unused, reserved)
+#   Loki                  3100
+#   Prometheus            9090
+#   Alertmanager          9093
+#   Grafana               3001
 
 services:
   postgres:
@@ -21,5 +34,85 @@ services:
       timeout: 5s
       retries: 10
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.108.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC — otel-demo services + agent send here
+      - "4318:4318"   # OTLP HTTP
+      - "8888:8888"   # collector's own internal metrics
+      - "13133:13133" # health_check extension (GET /healthz -> 200 ok)
+      - "55679:55679" # zpages UI (http://localhost:55679/debug/tracez etc.)
+    depends_on:
+      - loki
+      - prometheus
+
+  loki:
+    image: grafana/loki:2.9.8
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail-config.yaml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      # Lets the OTel Collector push metrics via POST /api/v1/otlp/v1/metrics
+      # (otlphttp/prometheus exporter in infra/otel-collector-config.yaml),
+      # in addition to the normal pull-based scrape_configs below. v2.55.1
+      # still gates this behind --enable-feature (stabilized as
+      # --web.enable-otlp-receiver only in v3.x).
+      - --enable-feature=otlp-write-receiver
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports:
+      # host 3000 is already claimed by kind-cluster.yaml's control-plane
+      # NodePort mapping, so this stack's Grafana lives on 3001 instead.
+      - "3001:3000"
+    environment:
+      # Local dev only — anonymous Viewer access, no signup. Put real auth in
+      # front of this before using it anywhere but a laptop/demo.
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+
 volumes:
   postgres-data:
+  loki-data:
+  prometheus-data:
+  grafana-data:

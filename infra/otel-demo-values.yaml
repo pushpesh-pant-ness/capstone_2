@@ -1,7 +1,12 @@
 # Local kind fire-drill overrides for the open-telemetry/opentelemetry-demo chart.
-# We already run our own Prometheus/Loki/Alertmanager/Grafana stack
-# (infra/docker-compose.observability.yaml), so disable the chart's bundled
-# copies to save resources and avoid port/scrape-target confusion.
+# We run our own OpenTelemetry Collector + Prometheus + Loki + Alertmanager +
+# Grafana stack (infra/docker-compose.yaml) instead of the chart's bundled
+# copies, so: disable the bundled jaeger/prometheus/grafana/opensearch/
+# opentelemetry-collector sub-charts, and point every demo component's OTLP
+# export straight at our Docker Compose collector on the host. Every demo
+# component already builds its OTLP endpoint from the single
+# `OTEL_COLLECTOR_NAME` env var (e.g. `http://$(OTEL_COLLECTOR_NAME):4317`),
+# so overriding just that one value redirects the whole app's telemetry.
 jaeger:
   enabled: false
 prometheus:
@@ -10,3 +15,15 @@ grafana:
   enabled: false
 opensearch:
   enabled: false
+# Disable the chart's own in-cluster collector daemonset entirely — nothing
+# reads from it anymore once every component points at host.docker.internal.
+opentelemetry-collector:
+  enabled: false
+
+default:
+  envOverrides:
+    - name: OTEL_COLLECTOR_NAME
+      # Docker Desktop resolves this to the host machine from inside kind's
+      # node containers, reaching infra/docker-compose.yaml's otel-collector
+      # service (published on host ports 4317/4318).
+      value: host.docker.internal

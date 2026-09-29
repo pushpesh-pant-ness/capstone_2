@@ -29,6 +29,17 @@ def test_check_plan_rejects_out_of_namespace_action():
     assert check_plan(plan, allowed_namespace="default") is not None
 
 
+def test_check_plan_rejects_deployment_name_mismatch():
+    # Observed live: LLM proposed "payment-service" when the real/given service was "payment".
+    plan = [{"name": "restart_pod", "params": {"deployment": "payment-service"}}]
+    assert check_plan(plan, allowed_namespace="default", expected_deployment="payment") is not None
+
+
+def test_check_plan_passes_matching_deployment_name():
+    plan = [{"name": "restart_pod", "params": {"deployment": "payment"}}]
+    assert check_plan(plan, allowed_namespace="default", expected_deployment="payment") is None
+
+
 # --- supervisor -----------------------------------------------------------------
 
 def _candidate(**overrides):
@@ -54,6 +65,18 @@ def test_find_auto_plan_candidate_requires_recovered_outcome():
 
 def test_find_auto_plan_candidate_requires_high_similarity():
     state = {"severity": "P4", "similar_incidents": [_candidate(similarity_score=0.2)]}
+    assert find_auto_plan_candidate(state) is None
+
+
+def test_find_auto_plan_candidate_rejects_cross_service_match():
+    # Observed live: two incidents both titled "PodCrashLooping" (one for
+    # "recommendation", one for "payment") reached the similarity threshold
+    # on title+severity alone, with no real service match.
+    state = {
+        "severity": "P4",
+        "service_name": "payment",
+        "similar_incidents": [_candidate(service_name="recommendation")],
+    }
     assert find_auto_plan_candidate(state) is None
 
 

@@ -20,10 +20,15 @@ Edit `.env` and fill in AWS Bedrock credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRE
 
 ## 3. Start infrastructure
 
-> **Minimal / no-Docker-cluster path:** for now we're skipping the kind cluster
-> and the Loki/Prometheus/Alertmanager stack and starting **only Postgres**
-> (Docker is still needed for that — the API always connects to a DB on
-> startup). Everything else degrades gracefully:
+One command now brings up **everything** (Postgres + OpenTelemetry Collector +
+Loki/Promtail + Prometheus + Alertmanager + Grafana) — no more separate
+observability file:
+
+```powershell
+docker compose -f infra/docker-compose.yaml up -d
+```
+
+> **No kind cluster yet?** Everything still degrades gracefully:
 > - [agent/nodes/investigate.py](agent/nodes/investigate.py) catches Loki/Prometheus/K8s
 >   lookup failures and records them as evidence instead of crashing.
 > - Remediation actions (restart_pod/rollback_deployment/scale_deployment) will
@@ -31,26 +36,25 @@ Edit `.env` and fill in AWS Bedrock credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRE
 >   testing detection → severity → RCA → plan → approval, not for the actual
 >   remediate/validate steps.
 >
-> Start the full stack (kind + observability) later with `scripts\setup.ps1` or
-> the commands below when you need those steps too.
-
-```powershell
-docker compose -f infra/docker-compose.yaml up -d
-```
-
-To also bring up Loki + Promtail + Prometheus + Alertmanager + Grafana (so the
-agent's investigate/RCA steps have real logs/metrics to pull, and you can
-browse them yourself):
-
-```powershell
-docker compose -f infra/docker-compose.observability.yaml up -d
-```
+> Start the kind cluster + otel-demo app later with `scripts\setup.ps1` (or
+> `kind create cluster --config infra/kind-cluster.yaml` +
+> `helm install otel-demo open-telemetry/opentelemetry-demo -n otel-demo -f infra/otel-demo-values.yaml`)
+> when you need real telemetry.
 
 Grafana comes up at http://localhost:3001 (anonymous Viewer access for local
 dev — host port 3000 is reserved by `infra/kind-cluster.yaml`'s control-plane
 NodePort mapping) with Prometheus + Loki pre-wired as data sources and an
 "Incident Agent Overview" dashboard (error rate, p95 latency, pod restarts,
 live logs) already provisioned — see [infra/grafana](infra/grafana).
+
+The OpenTelemetry Collector (`infra/otel-collector-config.yaml`) receives OTLP
+logs/metrics/traces from the otel-demo app (see `infra/otel-demo-values.yaml`,
+which points every demo component at `host.docker.internal:4317`/`4318`) and
+fans them out: logs → Loki (visible in Grafana Explore / the dashboard's live
+logs panel), metrics → Prometheus (via its OTLP receiver), traces → the
+collector's own debug log output (`docker compose -f infra/docker-compose.yaml
+logs -f otel-collector`). Health check: http://localhost:13133/ ; live
+internal state (zpages): http://localhost:55679/debug/tracez .
 
 ## 4. Apply the DB migration
 
@@ -108,11 +112,12 @@ scripts\teardown.ps1
 
 ## Reference — service ports
 
-| Service      | Port |
-|--------------|------|
-| Agent API/UI | 8090 |
-| Postgres     | 5432 |
-| Loki         | 3100 |
-| Prometheus   | 9090 |
-| Alertmanager | 9093 |
-| Grafana      | 3001 |
+| Service                    | Port        |
+|----------------------------|-------------|
+| Agent API/UI               | 8090        |
+| Postgres                   | 5432        |
+| Opentelemetry              |             |
+| Loki                       | 3100        |
+| Prometheus                 | 9090        |
+| Alertmanager               | 9093        |
+| Grafana                    | 3001        |

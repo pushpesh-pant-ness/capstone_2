@@ -120,6 +120,7 @@ async def run_remediation_and_validation(incident_id: UUID) -> None:
     await repo.log_audit_event(incident_id, "system", "state_transition", {"status": "remediating"})
 
     execution_results = []
+    action_errors: list[str] = []
     for action in plan:
         if action.get("name") not in allowed:
             # FR-15: re-checked independently of the Planning node's own filtering.
@@ -133,16 +134,26 @@ async def run_remediation_and_validation(incident_id: UUID) -> None:
                 result = k8s_tool.call(action["name"], dry_run=_dry_run_enabled(), **params)
             except Exception as exc:  # noqa: BLE001
                 result = {"error": str(exc)}
+        if "error" in result:
+            action_errors.append(result["error"])
         execution_results.append({"action": action, "result": result})
         await repo.log_audit_event(incident_id, "agent", "tool_call", {"action": action, "result": result})
 
     await repo.update_incident(incident_id, status="validating")
     await repo.log_audit_event(incident_id, "system", "state_transition", {"status": "validating"})
 
-    validation_result = await _validate_recovery(incident)
+    if action_errors:
+        # A remediation action that never actually executed cannot have fixed
+        # anything — don't let a health check (which may itself be blind, e.g.
+        # missing metrics) mask this as a false "resolved".
+        validation_result = {"recovered": False, "evidence": {"action_errors": action_errors}}
+    else:
+        validation_result = await _validate_recovery(incident)
     validation_result["execution_results"] = execution_results
 
     final_status = "resolved" if validation_result["recovered"] else "escalated"
+    if final_status == "escalated" and action_errors:
+        await repo.update_incident(incident_id, escalation_reason=f"remediation action failed: {action_errors[0]}")
     await repo.mark_resolution(incident_id, final_status, validation_result)
     await repo.log_audit_event(
         incident_id, "system", "state_transition", {"status": final_status, "validation": validation_result}

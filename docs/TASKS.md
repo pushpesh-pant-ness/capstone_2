@@ -38,7 +38,7 @@
 ## 2. Track 1 — Platform & Product (Person 1)
 
 ### 2.1 Observability Stack (Hour 2–8)
-- [x] `infra/docker-compose.observability.yaml`: Loki, Promtail, Prometheus, Alertmanager.
+- [x] `infra/docker-compose.yaml`: Postgres, OpenTelemetry Collector, Loki, Promtail, Prometheus, Alertmanager, Grafana (single consolidated compose file).
 - [x] Point Promtail/Prometheus scrape configs at the monitored app (`open-telemetry/opentelemetry-demo` deployed via Helm into `kind`, namespace `otel-demo`; kube-state-metrics added for pod-restart metrics — see RUN.md).
 - [x] Alert rules for: crash-loop pods, elevated error rate, latency SLO breach (`infra/alert_rules.yml`; `PodCrashLooping` now emits a `service` label so incidents attribute to the right deployment).
 - [x] Alertmanager webhook receiver config pointing at `api/routers/alerts.py` (real endpoint, not a stub — verified live).

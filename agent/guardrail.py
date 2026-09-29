@@ -17,7 +17,11 @@ REQUIRED_PARAMS: dict[str, set[str]] = {
 
 
 def check_plan(
-    plan: list[dict[str, Any]], *, allowed_namespace: str, max_actions: int = 3
+    plan: list[dict[str, Any]],
+    *,
+    allowed_namespace: str,
+    max_actions: int = 3,
+    expected_deployment: Optional[str] = None,
 ) -> Optional[str]:
     """Returns None if the plan is safe to show a human, else an escalation reason."""
     if not plan or len(plan) > max_actions:
@@ -30,4 +34,13 @@ def check_plan(
         if required is not None and not required.issubset(params):
             missing = required - params.keys()
             return f"action '{action.get('name')}' missing required params: {sorted(missing)}"
+        # The LLM has been observed inventing plausible-looking but wrong
+        # deployment names (e.g. "payment-service" when the real/given service
+        # is "payment") instead of echoing the incident's actual service_name
+        # back verbatim — catch that here rather than letting execution 404.
+        if expected_deployment and params.get("deployment") not in (None, expected_deployment):
+            return (
+                f"action '{action.get('name')}' targets deployment "
+                f"'{params.get('deployment')}', expected '{expected_deployment}'"
+            )
     return None

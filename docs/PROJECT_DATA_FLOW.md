@@ -9,7 +9,8 @@ A plain-English + diagram walkthrough of the whole system: every service involve
 | # | Service | Role | Lives in this repo? |
 |---|---|---|---|
 | 1 | **Monitored application** (e.g. OpenTelemetry demo microservices) | The app being watched. Emits logs + `/metrics`. Runs on Kubernetes. | No — external target |
-| 2 | **Grafana Loki + Promtail** | Collects/stores structured logs from the monitored app's pods. | [infra/docker-compose.observability.yaml](../infra/docker-compose.observability.yaml), [infra/promtail-config.yaml](../infra/promtail-config.yaml) |
+| 2 | **OpenTelemetry Collector** | Receives OTLP logs/metrics/traces from the monitored app; exports logs to Loki, metrics to Prometheus. | [infra/docker-compose.yaml](../infra/docker-compose.yaml), [infra/otel-collector-config.yaml](../infra/otel-collector-config.yaml) |
+| 3 | **Grafana Loki + Promtail** | Collects/stores structured logs from the monitored app's pods (and the OTel Collector's forwarded logs). | [infra/docker-compose.yaml](../infra/docker-compose.yaml), [infra/promtail-config.yaml](../infra/promtail-config.yaml) |
 | 3 | **Prometheus** | Scrapes `/metrics` from the monitored app + `kube-state-metrics`; evaluates alert rules. | [infra/prometheus.yml](../infra/prometheus.yml), [infra/alert_rules.yml](../infra/alert_rules.yml) |
 | 4 | **Alertmanager** | Receives firing alerts from Prometheus, dedupes/groups them, fires a webhook. | [infra/alertmanager.yml](../infra/alertmanager.yml) |
 | 5 | **Agent Intake API** (FastAPI) | Receives the Alertmanager webhook, creates/dedupes an Incident row, kicks off the agent pipeline. | [api/routers/alerts.py](../api/routers/alerts.py) |

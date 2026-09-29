@@ -20,7 +20,11 @@ APP_NAMESPACE = os.environ.get("APP_NAMESPACE", "default")
 async def guardrail(state: AgentState) -> Optional[dict[str, Any]]:
     # None (not {}) when the plan passes — LangGraph rejects an empty dict as
     # an invalid node update.
-    reason = check_plan(state.get("remediation_plan") or [], allowed_namespace=APP_NAMESPACE)
+    reason = check_plan(
+        state.get("remediation_plan") or [],
+        allowed_namespace=APP_NAMESPACE,
+        expected_deployment=state.get("service_name"),
+    )
     return {"escalation_reason": reason} if reason else None
 
 

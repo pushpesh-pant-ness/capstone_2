@@ -16,12 +16,19 @@ def find_auto_plan_candidate(state: AgentState) -> Optional[dict[str, Any]]:
     """A historical incident is replay-eligible only if it actually recovered
     (validation_result.recovered), scored high enough on the heuristic
     similarity (agent/heuristics.score_similar_incidents) to trust its plan
-    wholesale, and left behind a non-empty remediation_plan.
+    wholesale, targeted the SAME service (title overlap alone — e.g. two
+    incidents both named "PodCrashLooping" — can reach the similarity
+    threshold across unrelated services, which would replay a plan whose
+    "deployment" param targets the wrong resource entirely), and left behind
+    a non-empty remediation_plan.
     """
     if state.get("severity") != AUTO_PLAN_SEVERITY:
         return None
+    service_name = state.get("service_name")
     for candidate in state.get("similar_incidents") or []:
         if candidate.get("similarity_score", 0.0) < AUTO_PLAN_SIMILARITY_THRESHOLD:
+            continue
+        if service_name and candidate.get("service_name") != service_name:
             continue
         if not candidate.get("remediation_plan"):
             continue

@@ -14,9 +14,8 @@ if ($existing -notcontains "incident-agent") {
     Write-Host "cluster 'incident-agent' already exists, skipping create"
 }
 
-Write-Host "== 2. Postgres + observability stack (Docker Compose) ==" -ForegroundColor Cyan
+Write-Host "== 2. Postgres + OTel Collector + observability stack (Docker Compose) ==" -ForegroundColor Cyan
 docker compose -f "$root\infra\docker-compose.yaml" up -d
-docker compose -f "$root\infra\docker-compose.observability.yaml" up -d
 
 Write-Host "== 3. .env ==" -ForegroundColor Cyan
 $envFile = "$root\.env"

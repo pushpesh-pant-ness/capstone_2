@@ -84,7 +84,8 @@ hackathon/
 │   └── repository.py            # only DB access surface — routers/agent never write raw SQL
 ├── infra/
 │   ├── kind-config.yaml
-│   └── docker-compose.observability.yaml   # Loki, Prometheus, Alertmanager
+│   ├── otel-collector-config.yaml           # OTel Collector: OTLP in, Loki/Prometheus out
+│   └── docker-compose.yaml                  # Postgres, OTel Collector, Loki, Prometheus, Alertmanager, Grafana
 ├── tests/
 └── scripts/
     ├── seed_historical_incidents.py
